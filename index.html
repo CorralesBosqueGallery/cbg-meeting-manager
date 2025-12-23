@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CBG Meeting Manager</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: #2E5A4C;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 8px;
+        }
+
+        header h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 0.95em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: #ddd;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            background: #ccc;
+        }
+
+        .tab-btn.active {
+            background: #2E5A4C;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        h2 {
+            color: #2E5A4C;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+
+        h3 {
+            color: #4A7C6F;
+            margin: 20px 0 10px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        input[type="time"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #2E5A4C;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #2E5A4C;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #234539;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        /* Agenda Items */
+        .agenda-items {
+            margin: 20px 0;
+        }
+
+        .agenda-item {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .agenda-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .agenda-item-number {
+            background: #2E5A4C;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .agenda-item input {
+            margin-bottom: 10px;
+        }
+
+        .agenda-item .remove-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #dc3545;
+            cursor: pointer;
+            font-size: 1.2em;
+        }
+
+        .agenda-item .remove-btn:hover {
+            color: #a71d2a;
+        }
+
+        .sub-items {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+
+        .sub-item {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .sub-item input {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .sub-item select {
+            width: 120px;
+            margin-bottom: 0;
+        }
+
+        .add-sub-item {
+            color: #2E5A4C;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9em;
+            padding: 5px 0;
+        }
+
+        .add-sub-item:hover {
+            text-decoration: underline;
+        }
+
+        /* Recording Section */
+        .recording-section {
+            text-align: center;
+            padding: 40px 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .record-btn {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: none;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+
+        .record-btn.ready {
+            background: #dc3545;
+            color: white;
+        }
+
+        .record-btn.ready:hover {
+            background: #c82333;
+            transform: scale(1.05);
+        }
+
+        .record-btn.recording {
+            background: #dc3545;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        .record-btn.paused {
+            background: #ffc107;
+            color: #333;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(220, 53, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+
+        .record-icon {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .timer {
+            font-size: 2em;
+            font-family: monospace;
+            color: #333;
+            margin: 20px 0;
+        }
+
+        .recording-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        /* Upload Section */
+        .upload-section {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            transition: all 0.2s;
+        }
+
+        .upload-section:hover {
+            border-color: #2E5A4C;
+        }
+
+        .upload-section.dragover {
+            background: #f0f7f4;
+            border-color: #2E5A4C;
+        }
+
+        .upload-section input[type="file"] {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            color: #999;
+            margin-bottom: 10px;
+        }
+
+        /* Status Messages */
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+
+        .status.info {
+            background: #e7f3ff;
+            color: #0056b3;
+            border: 1px solid #b8daff;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        /* Progress */
+        .progress-container {
+            margin: 20px 0;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #2E5A4C;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+        }
+
+        /* Results Section */
+        .transcript-box {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: inherit;
+            line-height: 1.8;
+        }
+
+        .minutes-box {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .action-item {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .action-item strong {
+            color: #856404;
+        }
+
+        /* Audio Player */
+        .audio-player {
+            width: 100%;
+            margin: 20px 0;
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+
+            header {
+                padding: 15px;
+            }
+
+            header h1 {
+                font-size: 1.4em;
+            }
+
+            .tab-btn {
+                padding: 10px 16px;
+                font-size: 0.9em;
+            }
+
+            .tab-content {
+                padding: 20px;
+            }
+
+            .record-btn {
+                width: 100px;
+                height: 100px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 CBG Meeting Manager</h1>
+            <p>Corrales Bosque Gallery — Record, Transcribe & Generate Minutes</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="agenda">1. Create Agenda</button>
+            <button class="tab-btn" data-tab="record">2. Record Meeting</button>
+            <button class="tab-btn" data-tab="transcribe">3. Transcribe</button>
+            <button class="tab-btn" data-tab="minutes">4. Generate Minutes</button>
+        </div>
+
+        <!-- TAB 1: AGENDA -->
+        <div id="agenda" class="tab-content active">
+            <h2>Meeting Agenda</h2>
+            
+            <div class="form-group">
+                <label for="meeting-type">Meeting Type</label>
+                <select id="meeting-type">
+                    <option value="member">General Membership Meeting</option>
+                    <option value="board">Board of Directors Meeting</option>
+                    <option value="committee">Committee Meeting</option>
+                    <option value="special">Special Meeting</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="meeting-date">Date</label>
+                <input type="date" id="meeting-date">
+            </div>
+
+            <div class="form-group">
+                <label for="meeting-time">Time</label>
+                <input type="time" id="meeting-time" value="09:00">
+            </div>
+
+            <div class="form-group">
+                <label for="meeting-location">Location</label>
+                <input type="text" id="meeting-location" value="Gallery" placeholder="Gallery, Zoom, etc.">
+            </div>
+
+            <h3>Agenda Items</h3>
+            <div id="agenda-items" class="agenda-items">
+                <!-- Agenda items will be added here -->
+            </div>
+
+            <button class="btn btn-secondary" onclick="addAgendaItem()">+ Add Agenda Item</button>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="loadTemplate()">Load Standard Template</button>
+                <button class="btn btn-success" onclick="saveAgenda()">Save Agenda</button>
+                <button class="btn btn-secondary" onclick="previewAgenda()">Preview</button>
+            </div>
+
+            <div id="agenda-preview" class="hidden" style="margin-top: 20px;">
+                <h3>Agenda Preview</h3>
+                <div id="agenda-preview-content" class="transcript-box"></div>
+            </div>
+        </div>
+
+        <!-- TAB 2: RECORD -->
+        <div id="record" class="tab-content">
+            <h2>Record Meeting</h2>
+
+            <div id="no-agenda-warning" class="status warning">
+                ⚠️ No agenda loaded. Consider creating an agenda first for better organization.
+            </div>
+
+            <div id="meeting-info" class="status info hidden">
+                <!-- Meeting info will appear here -->
+            </div>
+
+            <h3>Option 1: Record in Browser</h3>
+            <div class="recording-section">
+                <button id="record-btn" class="record-btn ready" onclick="toggleRecording()">
+                    <span class="record-icon">⏺</span>
+                    <span class="record-text">Start</span>
+                </button>
+                <div id="timer" class="timer">00:00:00</div>
+                <div id="recording-status"></div>
+                <div class="recording-controls hidden" id="recording-controls">
+                    <button class="btn btn-secondary" onclick="pauseRecording()">⏸ Pause</button>
+                    <button class="btn btn-danger" onclick="stopRecording()">⏹ Stop & Save</button>
+                </div>
+            </div>
+
+            <h3>Option 2: Upload Recording</h3>
+            <div class="upload-section" id="upload-section">
+                <div class="upload-icon">📁</div>
+                <p>Drag and drop an audio file here, or click to browse</p>
+                <p style="color: #999; font-size: 0.9em; margin-top: 10px;">Supports MP3, M4A, WAV, WEBM (max 25MB)</p>
+                <input type="file" id="audio-upload" accept="audio/*" onchange="handleFileUpload(event)">
+                <button class="btn btn-secondary" onclick="document.getElementById('audio-upload').click()">Choose File</button>
+            </div>
+
+            <div id="audio-preview" class="hidden">
+                <h3>Recording Preview</h3>
+                <audio id="audio-player" class="audio-player" controls></audio>
+                <p id="audio-filename" style="color: #666; margin-top: 10px;"></p>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="proceedToTranscribe()">Proceed to Transcription →</button>
+                    <button class="btn btn-secondary" onclick="clearAudio()">Clear & Start Over</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: TRANSCRIBE -->
+        <div id="transcribe" class="tab-content">
+            <h2>Transcribe Recording</h2>
+
+            <div id="no-audio-warning" class="status warning">
+                ⚠️ No audio loaded. Please record or upload audio first.
+            </div>
+
+            <div id="transcribe-ready" class="hidden">
+                <div class="status info">
+                    <strong>Ready to transcribe:</strong> <span id="transcribe-filename"></span>
+                    <br><small>Duration: <span id="transcribe-duration"></span></small>
+                </div>
+
+                <p style="margin: 20px 0;">Click the button below to send the recording to OpenAI Whisper for transcription. This typically takes 30-60 seconds per 10 minutes of audio.</p>
+
+                <button id="transcribe-btn" class="btn btn-primary" onclick="startTranscription()">
+                    🎤 Start Transcription
+                </button>
+
+                <div id="transcription-progress" class="progress-container hidden">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <p class="progress-text" id="progress-text">Uploading audio...</p>
+                </div>
+            </div>
+
+            <div id="transcription-result" class="hidden">
+                <h3>Transcription</h3>
+                <div class="status success">✓ Transcription complete!</div>
+                <div id="transcript-text" class="transcript-box"></div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="proceedToMinutes()">Generate Minutes →</button>
+                    <button class="btn btn-secondary" onclick="copyTranscript()">Copy to Clipboard</button>
+                    <button class="btn btn-secondary" onclick="downloadTranscript()">Download as Text</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: MINUTES -->
+        <div id="minutes" class="tab-content">
+            <h2>Generate Meeting Minutes</h2>
+
+            <div id="no-transcript-warning" class="status warning">
+                ⚠️ No transcript available. Please transcribe a recording first.
+            </div>
+
+            <div id="minutes-ready" class="hidden">
+                <p style="margin-bottom: 20px;">AI will analyze the transcript and generate formatted meeting minutes, including action items.</p>
+
+                <button id="generate-btn" class="btn btn-primary" onclick="generateMinutes()">
+                    📝 Generate Minutes
+                </button>
+
+                <div id="minutes-progress" class="progress-container hidden">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="minutes-progress-fill" style="width: 0%"></div>
+                    </div>
+                    <p class="progress-text" id="minutes-progress-text">Analyzing transcript...</p>
+                </div>
+            </div>
+
+            <div id="minutes-result" class="hidden">
+                <h3>Meeting Minutes</h3>
+                <div class="status success">✓ Minutes generated!</div>
+                
+                <div id="minutes-content" class="minutes-box"></div>
+
+                <div id="action-items-section" class="hidden">
+                    <h3>Action Items</h3>
+                    <div id="action-items-list"></div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="downloadWord()">📄 Download Word</button>
+                    <button class="btn btn-primary" onclick="downloadPDF()">📑 Download PDF</button>
+                    <button class="btn btn-secondary" onclick="copyMinutes()">Copy to Clipboard</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== STATE ====================
+        let currentAgenda = {
+            type: 'member',
+            date: '',
+            time: '09:00',
+            location: 'Gallery',
+            items: []
+        };
+
+        let audioBlob = null;
+        let audioUrl = null;
+        let transcript = '';
+        let minutes = '';
+        let actionItems = [];
+
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordingStartTime = null;
+        let timerInterval = null;
+        let isRecording = false;
+        let isPaused = false;
+
+        // ==================== TAB NAVIGATION ====================
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+                
+                // Update buttons
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Update content
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(tabId).classList.add('active');
+
+                // Update UI state for each tab
+                updateTabState(tabId);
+            });
+        });
+
+        function updateTabState(tabId) {
+            if (tabId === 'record') {
+                // Show/hide agenda warning
+                const hasAgenda = currentAgenda.items.length > 0;
+                document.getElementById('no-agenda-warning').classList.toggle('hidden', hasAgenda);
+                document.getElementById('meeting-info').classList.toggle('hidden', !hasAgenda);
+                if (hasAgenda) {
+                    const typeNames = {
+                        'member': 'General Membership Meeting',
+                        'board': 'Board of Directors Meeting',
+                        'committee': 'Committee Meeting',
+                        'special': 'Special Meeting'
+                    };
+                    document.getElementById('meeting-info').innerHTML = `
+                        <strong>${typeNames[currentAgenda.type]}</strong><br>
+                        ${currentAgenda.date} at ${currentAgenda.time} — ${currentAgenda.location}<br>
+                        ${currentAgenda.items.length} agenda items
+                    `;
+                }
+            } else if (tabId === 'transcribe') {
+                const hasAudio = audioBlob !== null;
+                document.getElementById('no-audio-warning').classList.toggle('hidden', hasAudio);
+                document.getElementById('transcribe-ready').classList.toggle('hidden', !hasAudio || transcript !== '');
+                document.getElementById('transcription-result').classList.toggle('hidden', transcript === '');
+            } else if (tabId === 'minutes') {
+                const hasTranscript = transcript !== '';
+                document.getElementById('no-transcript-warning').classList.toggle('hidden', hasTranscript);
+                document.getElementById('minutes-ready').classList.toggle('hidden', !hasTranscript || minutes !== '');
+                document.getElementById('minutes-result').classList.toggle('hidden', minutes === '');
+            }
+        }
+
+        // ==================== AGENDA FUNCTIONS ====================
+        function addAgendaItem(title = '', isVote = false) {
+            const itemsContainer = document.getElementById('agenda-items');
+            const itemNumber = itemsContainer.children.length + 1;
+            
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'agenda-item';
+            itemDiv.innerHTML = `
+                <button class="remove-btn" onclick="removeAgendaItem(this)">✕</button>
+                <div class="agenda-item-header">
+                    <span class="agenda-item-number">${itemNumber}</span>
+                </div>
+                <input type="text" placeholder="Agenda item title" value="${title}" onchange="updateAgendaState()">
+                <label style="font-weight: normal; display: inline-flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" ${isVote ? 'checked' : ''} onchange="updateAgendaState()"> Requires Vote
+                </label>
+                <div class="sub-items"></div>
+                <button class="add-sub-item" onclick="addSubItem(this)">+ Add sub-item</button>
+            `;
+            itemsContainer.appendChild(itemDiv);
+            renumberAgendaItems();
+            updateAgendaState();
+        }
+
+        function addSubItem(button) {
+            const subItemsContainer = button.previousElementSibling;
+            const subItemDiv = document.createElement('div');
+            subItemDiv.className = 'sub-item';
+            subItemDiv.innerHTML = `
+                <input type="text" placeholder="Sub-item description" onchange="updateAgendaState()">
+                <select onchange="updateAgendaState()">
+                    <option value="discuss">Discussion</option>
+                    <option value="vote">Vote</option>
+                    <option value="update">Update</option>
+                </select>
+                <button class="remove-btn" onclick="removeSubItem(this)" style="position:static;">✕</button>
+            `;
+            subItemsContainer.appendChild(subItemDiv);
+            updateAgendaState();
+        }
+
+        function removeAgendaItem(button) {
+            button.parentElement.remove();
+            renumberAgendaItems();
+            updateAgendaState();
+        }
+
+        function removeSubItem(button) {
+            button.parentElement.remove();
+            updateAgendaState();
+        }
+
+        function renumberAgendaItems() {
+            document.querySelectorAll('.agenda-item').forEach((item, index) => {
+                item.querySelector('.agenda-item-number').textContent = index + 1;
+            });
+        }
+
+        function updateAgendaState() {
+            currentAgenda.type = document.getElementById('meeting-type').value;
+            currentAgenda.date = document.getElementById('meeting-date').value;
+            currentAgenda.time = document.getElementById('meeting-time').value;
+            currentAgenda.location = document.getElementById('meeting-location').value;
+
+            currentAgenda.items = [];
+            document.querySelectorAll('.agenda-item').forEach(item => {
+                const title = item.querySelector('input[type="text"]').value;
+                const isVote = item.querySelector('input[type="checkbox"]').checked;
+                const subItems = [];
+                
+                item.querySelectorAll('.sub-item').forEach(sub => {
+                    subItems.push({
+                        text: sub.querySelector('input').value,
+                        type: sub.querySelector('select').value
+                    });
+                });
+
+                currentAgenda.items.push({ title, isVote, subItems });
+            });
+        }
+
+        function loadTemplate() {
+            // Clear existing items
+            document.getElementById('agenda-items').innerHTML = '';
+
+            // Set meeting type to member
+            document.getElementById('meeting-type').value = 'member';
+
+            // Standard template based on Bylaws
+            const templateItems = [
+                { title: 'Call to Order', isVote: false, subItems: [] },
+                { title: 'Quorum Confirmation (51% required)', isVote: false, subItems: [] },
+                { title: 'Approval of Minutes', isVote: true, subItems: [] },
+                { title: 'Financial Report', isVote: false, subItems: [] },
+                { title: 'Committee Reports', isVote: false, subItems: [
+                    { text: 'PR/Marketing', type: 'update' },
+                    { text: 'Events', type: 'update' },
+                    { text: 'Other Committees', type: 'update' }
+                ]},
+                { title: 'Old Business', isVote: false, subItems: [] },
+                { title: 'New Business', isVote: false, subItems: [] },
+                { title: 'Announcements & Upcoming Dates', isVote: false, subItems: [] },
+                { title: 'Adjourn', isVote: true, subItems: [] }
+            ];
+
+            templateItems.forEach(item => {
+                addAgendaItem(item.title, item.isVote);
+                if (item.subItems.length > 0) {
+                    const lastItem = document.querySelector('.agenda-item:last-child');
+                    const addSubBtn = lastItem.querySelector('.add-sub-item');
+                    item.subItems.forEach(sub => {
+                        addSubBtn.click();
+                        const lastSub = lastItem.querySelector('.sub-item:last-child');
+                        lastSub.querySelector('input').value = sub.text;
+                        lastSub.querySelector('select').value = sub.type;
+                    });
+                }
+            });
+
+            updateAgendaState();
+        }
+
+        function saveAgenda() {
+            updateAgendaState();
+            localStorage.setItem('cbg-meeting-agenda', JSON.stringify(currentAgenda));
+            alert('Agenda saved!');
+        }
+
+        function previewAgenda() {
+            updateAgendaState();
+            const preview = formatAgendaText();
+            document.getElementById('agenda-preview-content').textContent = preview;
+            document.getElementById('agenda-preview').classList.remove('hidden');
+        }
+
+        function formatAgendaText() {
+            const typeNames = {
+                'member': 'General Membership Meeting',
+                'board': 'Board of Directors Meeting',
+                'committee': 'Committee Meeting',
+                'special': 'Special Meeting'
+            };
+
+            let text = `CORRALES BOSQUE GALLERY\n`;
+            text += `${typeNames[currentAgenda.type]}\n\n`;
+            text += `Date: ${currentAgenda.date || '(not set)'}\n`;
+            text += `Time: ${currentAgenda.time}\n`;
+            text += `Location: ${currentAgenda.location}\n\n`;
+            text += `AGENDA\n${'─'.repeat(40)}\n\n`;
+
+            currentAgenda.items.forEach((item, index) => {
+                text += `${index + 1}. ${item.title}`;
+                if (item.isVote) text += ' — VOTE';
+                text += '\n';
+                
+                item.subItems.forEach((sub, subIndex) => {
+                    const letter = String.fromCharCode(97 + subIndex); // a, b, c...
+                    const typeLabel = sub.type === 'vote' ? '[VOTE]' : sub.type === 'update' ? '[Update]' : '';
+                    text += `   ${letter}. ${sub.text} ${typeLabel}\n`;
+                });
+                text += '\n';
+            });
+
+            return text;
+        }
+
+        // ==================== RECORDING FUNCTIONS ====================
+        async function toggleRecording() {
+            if (!isRecording) {
+                await startRecording();
+            } else if (isPaused) {
+                resumeRecording();
+            } else {
+                // If recording, clicking the button will pause
+                pauseRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioUrl = URL.createObjectURL(audioBlob);
+                    showAudioPreview('recording.webm');
+                };
+
+                mediaRecorder.start(1000); // Capture in 1-second chunks
+                isRecording = true;
+                isPaused = false;
+                recordingStartTime = Date.now();
+                
+                updateRecordingUI();
+                startTimer();
+                
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                alert('Could not access microphone. Please ensure you have granted permission.');
+            }
+        }
+
+        function pauseRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.pause();
+                isPaused = true;
+                updateRecordingUI();
+                stopTimer();
+            }
+        }
+
+        function resumeRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'paused') {
+                mediaRecorder.resume();
+                isPaused = false;
+                updateRecordingUI();
+                startTimer();
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                isPaused = false;
+                stopTimer();
+                updateRecordingUI();
+            }
+        }
+
+        function updateRecordingUI() {
+            const btn = document.getElementById('record-btn');
+            const controls = document.getElementById('recording-controls');
+            const icon = btn.querySelector('.record-icon');
+            const text = btn.querySelector('.record-text');
+
+            if (!isRecording) {
+                btn.className = 'record-btn ready';
+                icon.textContent = '⏺';
+                text.textContent = 'Start';
+                controls.classList.add('hidden');
+            } else if (isPaused) {
+                btn.className = 'record-btn paused';
+                icon.textContent = '▶';
+                text.textContent = 'Resume';
+                controls.classList.remove('hidden');
+            } else {
+                btn.className = 'record-btn recording';
+                icon.textContent = '⏸';
+                text.textContent = 'Pause';
+                controls.classList.remove('hidden');
+            }
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function updateTimer() {
+            const elapsed = Date.now() - recordingStartTime;
+            const seconds = Math.floor(elapsed / 1000) % 60;
+            const minutes = Math.floor(elapsed / 60000) % 60;
+            const hours = Math.floor(elapsed / 3600000);
+            
+            document.getElementById('timer').textContent = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // ==================== UPLOAD FUNCTIONS ====================
+        const uploadSection = document.getElementById('upload-section');
+
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('audio/')) {
+                processAudioFile(file);
+            } else {
+                alert('Please upload an audio file.');
+            }
+        });
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processAudioFile(file);
+            }
+        }
+
+        function processAudioFile(file) {
+            if (file.size > 25 * 1024 * 1024) {
+                alert('File is too large. Maximum size is 25MB.');
+                return;
+            }
+
+            audioBlob = file;
+            audioUrl = URL.createObjectURL(file);
+            showAudioPreview(file.name);
+        }
+
+        function showAudioPreview(filename) {
+            const player = document.getElementById('audio-player');
+            player.src = audioUrl;
+            document.getElementById('audio-filename').textContent = `File: ${filename}`;
+            document.getElementById('audio-preview').classList.remove('hidden');
+            
+            // Update transcribe tab info
+            document.getElementById('transcribe-filename').textContent = filename;
+            player.onloadedmetadata = () => {
+                const duration = Math.floor(player.duration);
+                const mins = Math.floor(duration / 60);
+                const secs = duration % 60;
+                document.getElementById('transcribe-duration').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
+        }
+
+        function clearAudio() {
+            audioBlob = null;
+            audioUrl = null;
+            transcript = '';
+            document.getElementById('audio-preview').classList.add('hidden');
+            document.getElementById('audio-player').src = '';
+            document.getElementById('audio-upload').value = '';
+        }
+
+        function proceedToTranscribe() {
+            document.querySelector('[data-tab="transcribe"]').click();
+        }
+
+        // ==================== TRANSCRIPTION FUNCTIONS ====================
+        async function startTranscription() {
+            if (!audioBlob) {
+                alert('No audio file loaded.');
+                return;
+            }
+
+            const transcribeBtn = document.getElementById('transcribe-btn');
+            const progressContainer = document.getElementById('transcription-progress');
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+
+            transcribeBtn.disabled = true;
+            progressContainer.classList.remove('hidden');
+
+            try {
+                // Step 1: Upload
+                progressText.textContent = 'Uploading audio...';
+                progressFill.style.width = '20%';
+
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+                formData.append('agenda', JSON.stringify(currentAgenda));
+
+                // Step 2: Transcribe
+                progressText.textContent = 'Transcribing with AI (this may take a minute)...';
+                progressFill.style.width = '50%';
+
+                const response = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Transcription failed');
+                }
+
+                progressFill.style.width = '90%';
+                progressText.textContent = 'Processing results...';
+
+                const result = await response.json();
+                transcript = result.transcript;
+
+                // Step 3: Display results
+                progressFill.style.width = '100%';
+                progressText.textContent = 'Complete!';
+
+                document.getElementById('transcript-text').textContent = transcript;
+                document.getElementById('transcription-result').classList.remove('hidden');
+                document.getElementById('transcribe-ready').classList.add('hidden');
+
+            } catch (error) {
+                console.error('Transcription error:', error);
+                alert('Transcription failed: ' + error.message);
+                progressContainer.classList.add('hidden');
+            } finally {
+                transcribeBtn.disabled = false;
+            }
+        }
+
+        function copyTranscript() {
+            navigator.clipboard.writeText(transcript);
+            alert('Transcript copied to clipboard!');
+        }
+
+        function downloadTranscript() {
+            const blob = new Blob([transcript], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transcript-${currentAgenda.date || 'meeting'}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function proceedToMinutes() {
+            document.querySelector('[data-tab="minutes"]').click();
+        }
+
+        // ==================== MINUTES GENERATION ====================
+        async function generateMinutes() {
+            if (!transcript) {
+                alert('No transcript available.');
+                return;
+            }
+
+            const generateBtn = document.getElementById('generate-btn');
+            const progressContainer = document.getElementById('minutes-progress');
+            const progressFill = document.getElementById('minutes-progress-fill');
+            const progressText = document.getElementById('minutes-progress-text');
+
+            generateBtn.disabled = true;
+            progressContainer.classList.remove('hidden');
+
+            try {
+                progressText.textContent = 'Analyzing transcript...';
+                progressFill.style.width = '30%';
+
+                const response = await fetch('/api/generate-minutes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        transcript,
+                        agenda: currentAgenda
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Generation failed');
+                }
+
+                progressFill.style.width = '80%';
+                progressText.textContent = 'Formatting minutes...';
+
+                const result = await response.json();
+                minutes = result.minutes;
+                actionItems = result.actionItems || [];
+
+                progressFill.style.width = '100%';
+                progressText.textContent = 'Complete!';
+
+                // Display minutes
+                document.getElementById('minutes-content').innerHTML = formatMinutesHTML(minutes);
+                
+                // Display action items
+                if (actionItems.length > 0) {
+                    document.getElementById('action-items-section').classList.remove('hidden');
+                    document.getElementById('action-items-list').innerHTML = actionItems.map(item => `
+                        <div class="action-item">
+                            <strong>${item.assignee || 'Unassigned'}:</strong> ${item.task}
+                            ${item.dueDate ? `<br><small>Due: ${item.dueDate}</small>` : ''}
+                        </div>
+                    `).join('');
+                }
+
+                document.getElementById('minutes-result').classList.remove('hidden');
+                document.getElementById('minutes-ready').classList.add('hidden');
+
+            } catch (error) {
+                console.error('Minutes generation error:', error);
+                alert('Generation failed: ' + error.message);
+                progressContainer.classList.add('hidden');
+            } finally {
+                generateBtn.disabled = false;
+            }
+        }
+
+        function formatMinutesHTML(text) {
+            // Convert markdown-like formatting to HTML
+            return text
+                .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+        }
+
+        function copyMinutes() {
+            navigator.clipboard.writeText(minutes);
+            alert('Minutes copied to clipboard!');
+        }
+
+        async function downloadWord() {
+            try {
+                const response = await fetch('/api/export-word', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        minutes,
+                        agenda: currentAgenda,
+                        actionItems
+                    })
+                });
+
+                if (!response.ok) throw new Error('Export failed');
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `CBG_Minutes_${currentAgenda.date || 'meeting'}.docx`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Export failed: ' + error.message);
+            }
+        }
+
+        async function downloadPDF() {
+            // For now, instruct user to print to PDF
+            alert('To save as PDF: Open the Word document and use "Save As" or "Print to PDF".\n\nDirect PDF export coming soon!');
+        }
+
+        // ==================== INITIALIZATION ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set today's date
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('meeting-date').value = today;
+
+            // Load saved agenda if exists
+            const savedAgenda = localStorage.getItem('cbg-meeting-agenda');
+            if (savedAgenda) {
+                try {
+                    currentAgenda = JSON.parse(savedAgenda);
+                    // Reconstruct UI from saved agenda
+                    document.getElementById('meeting-type').value = currentAgenda.type;
+                    document.getElementById('meeting-date').value = currentAgenda.date;
+                    document.getElementById('meeting-time').value = currentAgenda.time;
+                    document.getElementById('meeting-location').value = currentAgenda.location;
+                    
+                    currentAgenda.items.forEach(item => {
+                        addAgendaItem(item.title, item.isVote);
+                        const lastAgendaItem = document.querySelector('.agenda-item:last-child');
+                        item.subItems.forEach(sub => {
+                            const addSubBtn = lastAgendaItem.querySelector('.add-sub-item');
+                            addSubBtn.click();
+                            const lastSub = lastAgendaItem.querySelector('.sub-item:last-child');
+                            lastSub.querySelector('input').value = sub.text;
+                            lastSub.querySelector('select').value = sub.type;
+                        });
+                    });
+                } catch (e) {
+                    console.error('Failed to load saved agenda:', e);
+                }
+            }
+
+            // Update form listeners
+            ['meeting-type', 'meeting-date', 'meeting-time', 'meeting-location'].forEach(id => {
+                document.getElementById(id).addEventListener('change', updateAgendaState);
+            });
+        });
+    </script>
+</body>
+</html>
