@@ -2,7 +2,6 @@ import formidable from 'formidable';
 import fs from 'fs';
 import FormData from 'form-data';
 
-// Disable body parser for file uploads
 export const config = {
     api: {
         bodyParser: false,
@@ -14,28 +13,38 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    // Check for API key
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
         return res.status(500).json({ error: 'OpenAI API key not configured' });
     }
 
     try {
-        // Parse the multipart form data
+        // Parse the multipart form data with explicit options
         const form = formidable({
-            maxFileSize: 25 * 1024 * 1024, // 25MB limit
+            maxFileSize: 25 * 1024 * 1024,
+            keepExtensions: true,
+            allowEmptyFiles: false,
+            multiples: false,
         });
 
-        const [fields, files] = await new Promise((resolve, reject) => {
-            form.parse(req, (err, fields, files) => {
-                if (err) reject(err);
-                else resolve([fields, files]);
-            });
-        });
+        let fields, files;
+        try {
+            [fields, files] = await form.parse(req);
+        } catch (parseError) {
+            console.error('Form parse error:', parseError);
+            return res.status(400).json({ error: 'Could not parse multipart form: ' + parseError.message });
+        }
 
-        const audioFile = files.audio?.[0] || files.audio;
+        console.log('Files received:', JSON.stringify(files, null, 2));
+
+        // Handle different possible file structures
+        let audioFile = files.audio;
+        if (Array.isArray(audioFile)) {
+            audioFile = audioFile[0];
+        }
+        
         if (!audioFile) {
-            return res.status(400).json({ error: 'No audio file provided' });
+            return res.status(400).json({ error: 'No audio file provided. Files received: ' + Object.keys(files).join(', ') });
         }
 
         // Read the audio file
@@ -43,31 +52,37 @@ export default async function handler(req, res) {
         
         // Determine file extension
         let filename = audioFile.originalFilename || 'audio.webm';
+        const mimeType = audioFile.mimetype || 'audio/webm';
+        
         if (!filename.includes('.')) {
             const mimeToExt = {
                 'audio/webm': 'webm',
                 'audio/mp3': 'mp3',
                 'audio/mpeg': 'mp3',
                 'audio/wav': 'wav',
+                'audio/wave': 'wav',
+                'audio/x-wav': 'wav',
                 'audio/m4a': 'm4a',
                 'audio/mp4': 'm4a',
+                'audio/x-m4a': 'm4a',
             };
-            const ext = mimeToExt[audioFile.mimetype] || 'webm';
+            const ext = mimeToExt[mimeType] || 'webm';
             filename = `audio.${ext}`;
         }
+
+        console.log('Processing file:', filename, 'Size:', audioData.length, 'Type:', mimeType);
 
         // Create form data for OpenAI API
         const formData = new FormData();
         formData.append('file', audioData, {
             filename: filename,
-            contentType: audioFile.mimetype || 'audio/webm',
+            contentType: mimeType,
         });
         formData.append('model', 'whisper-1');
         formData.append('language', 'en');
         formData.append('response_format', 'text');
         
-        // Optional: Add prompt for better accuracy with gallery-specific terms
-        const prompt = `This is a recording of a Corrales Bosque Gallery meeting. Common terms include: CBG, gallery, cooperative, Square (point of sale), First Sunday, consignment, commission, jurying, bylaws, quorum, treasurer, CAST, AABA.`;
+        const prompt = `This is a recording of a Corrales Bosque Gallery meeting. Common terms include: CBG, gallery, cooperative, Square, First Sunday, consignment, commission, jurying, bylaws, quorum, treasurer.`;
         formData.append('prompt', prompt);
 
         // Call OpenAI Whisper API
@@ -81,22 +96,25 @@ export default async function handler(req, res) {
         });
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: { message: response.statusText } }));
-            console.error('OpenAI API error:', error);
+            const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
+            console.error('OpenAI API error:', errorData);
             return res.status(response.status).json({ 
-                error: error.error?.message || 'Transcription failed' 
+                error: errorData.error?.message || 'Transcription failed' 
             });
         }
 
         const transcript = await response.text();
 
         // Clean up temp file
-        fs.unlinkSync(audioFile.filepath);
+        try {
+            fs.unlinkSync(audioFile.filepath);
+        } catch (e) {
+            console.warn('Could not delete temp file:', e.message);
+        }
 
-        // Return the transcript
         return res.status(200).json({ 
             transcript,
-            duration: audioFile.size / 16000,
+            filename: filename,
         });
 
     } catch (error) {
