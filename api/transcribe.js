@@ -1,5 +1,6 @@
-import formidable from 'formidable';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import FormData from 'form-data';
 
 export const config = {
@@ -7,6 +8,59 @@ export const config = {
         bodyParser: false,
     },
 };
+
+// Helper to parse raw body
+async function getRawBody(req) {
+    const chunks = [];
+    for await (const chunk of req) {
+        chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+}
+
+// Simple multipart parser
+function parseMultipart(buffer, boundary) {
+    const parts = [];
+    const boundaryBuffer = Buffer.from('--' + boundary);
+    
+    let start = buffer.indexOf(boundaryBuffer) + boundaryBuffer.length;
+    
+    while (start < buffer.length) {
+        // Find the end of this part
+        let end = buffer.indexOf(boundaryBuffer, start);
+        if (end === -1) break;
+        
+        const part = buffer.slice(start, end);
+        
+        // Skip \r\n at the start
+        let headerEnd = part.indexOf('\r\n\r\n');
+        if (headerEnd === -1) {
+            start = end + boundaryBuffer.length;
+            continue;
+        }
+        
+        const headerSection = part.slice(0, headerEnd).toString();
+        const body = part.slice(headerEnd + 4, -2); // -2 to remove trailing \r\n
+        
+        // Parse headers
+        const nameMatch = headerSection.match(/name="([^"]+)"/);
+        const filenameMatch = headerSection.match(/filename="([^"]+)"/);
+        const contentTypeMatch = headerSection.match(/Content-Type:\s*([^\r\n]+)/i);
+        
+        if (nameMatch) {
+            parts.push({
+                name: nameMatch[1],
+                filename: filenameMatch ? filenameMatch[1] : null,
+                contentType: contentTypeMatch ? contentTypeMatch[1] : null,
+                data: body,
+            });
+        }
+        
+        start = end + boundaryBuffer.length;
+    }
+    
+    return parts;
+}
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -19,62 +73,40 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Parse the multipart form data with explicit options
-        const form = formidable({
-            maxFileSize: 25 * 1024 * 1024,
-            keepExtensions: true,
-            allowEmptyFiles: false,
-            multiples: false,
-        });
-
-        let fields, files;
-        try {
-            [fields, files] = await form.parse(req);
-        } catch (parseError) {
-            console.error('Form parse error:', parseError);
-            return res.status(400).json({ error: 'Could not parse multipart form: ' + parseError.message });
-        }
-
-        console.log('Files received:', JSON.stringify(files, null, 2));
-
-        // Handle different possible file structures
-        let audioFile = files.audio;
-        if (Array.isArray(audioFile)) {
-            audioFile = audioFile[0];
+        // Get content type and boundary
+        const contentType = req.headers['content-type'] || '';
+        const boundaryMatch = contentType.match(/boundary=(.+)$/);
+        
+        if (!boundaryMatch) {
+            return res.status(400).json({ error: 'No multipart boundary found' });
         }
         
-        if (!audioFile) {
-            return res.status(400).json({ error: 'No audio file provided. Files received: ' + Object.keys(files).join(', ') });
+        const boundary = boundaryMatch[1];
+        
+        // Get raw body
+        const rawBody = await getRawBody(req);
+        
+        // Parse multipart data
+        const parts = parseMultipart(rawBody, boundary);
+        
+        // Find the audio file
+        const audioPart = parts.find(p => p.name === 'audio' && p.data.length > 0);
+        
+        if (!audioPart) {
+            return res.status(400).json({ 
+                error: 'No audio file found',
+                partsFound: parts.map(p => ({ name: p.name, size: p.data?.length }))
+            });
         }
 
-        // Read the audio file
-        const audioData = fs.readFileSync(audioFile.filepath);
-        
-        // Determine file extension
-        let filename = audioFile.originalFilename || 'audio.webm';
-        const mimeType = audioFile.mimetype || 'audio/webm';
-        
-        if (!filename.includes('.')) {
-            const mimeToExt = {
-                'audio/webm': 'webm',
-                'audio/mp3': 'mp3',
-                'audio/mpeg': 'mp3',
-                'audio/wav': 'wav',
-                'audio/wave': 'wav',
-                'audio/x-wav': 'wav',
-                'audio/m4a': 'm4a',
-                'audio/mp4': 'm4a',
-                'audio/x-m4a': 'm4a',
-            };
-            const ext = mimeToExt[mimeType] || 'webm';
-            filename = `audio.${ext}`;
-        }
+        const filename = audioPart.filename || 'audio.webm';
+        const mimeType = audioPart.contentType || 'audio/webm';
 
-        console.log('Processing file:', filename, 'Size:', audioData.length, 'Type:', mimeType);
+        console.log('Processing:', filename, 'Size:', audioPart.data.length, 'Type:', mimeType);
 
         // Create form data for OpenAI API
         const formData = new FormData();
-        formData.append('file', audioData, {
+        formData.append('file', audioPart.data, {
             filename: filename,
             contentType: mimeType,
         });
@@ -104,13 +136,6 @@ export default async function handler(req, res) {
         }
 
         const transcript = await response.text();
-
-        // Clean up temp file
-        try {
-            fs.unlinkSync(audioFile.filepath);
-        } catch (e) {
-            console.warn('Could not delete temp file:', e.message);
-        }
 
         return res.status(200).json({ 
             transcript,
