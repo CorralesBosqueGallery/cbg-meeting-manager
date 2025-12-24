@@ -1,7 +1,6 @@
-const formidable = require('formidable');
-const fs = require('fs');
-const path = require('path');
-const FormData = require('form-data');
+import formidable from 'formidable';
+import fs from 'fs';
+import FormData from 'form-data';
 
 // Disable body parser for file uploads
 export const config = {
@@ -45,7 +44,6 @@ export default async function handler(req, res) {
         // Determine file extension
         let filename = audioFile.originalFilename || 'audio.webm';
         if (!filename.includes('.')) {
-            // Try to determine from mimetype
             const mimeToExt = {
                 'audio/webm': 'webm',
                 'audio/mp3': 'mp3',
@@ -98,7 +96,7 @@ export default async function handler(req, res) {
         // Return the transcript
         return res.status(200).json({ 
             transcript,
-            duration: audioFile.size / 16000, // Rough estimate
+            duration: audioFile.size / 16000,
         });
 
     } catch (error) {
