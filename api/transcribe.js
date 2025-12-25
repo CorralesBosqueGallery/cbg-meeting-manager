@@ -21,7 +21,6 @@ function parseMultipart(buffer, boundary) {
     const parts = [];
     const boundaryStr = '--' + boundary;
     const bufferStr = buffer.toString('binary');
-    
     const sections = bufferStr.split(boundaryStr);
     
     for (let i = 1; i < sections.length; i++) {
@@ -33,7 +32,6 @@ function parseMultipart(buffer, boundary) {
         
         const headerPart = section.substring(0, headerEndIndex);
         const bodyPart = section.substring(headerEndIndex + 4);
-        
         const cleanBody = bodyPart.replace(/\r\n$/, '');
         
         const nameMatch = headerPart.match(/name="([^"]+)"/);
@@ -50,7 +48,6 @@ function parseMultipart(buffer, boundary) {
             });
         }
     }
-    
     return parts;
 }
 
@@ -76,11 +73,9 @@ export default async function handler(req, res) {
         
         const boundary = boundaryMatch[1] || boundaryMatch[2];
         const rawBody = await getRawBody(req);
-        
         console.log('Raw body size:', rawBody.length);
         
         const parts = parseMultipart(rawBody, boundary);
-        
         console.log('Parts found:', parts.map(p => ({ name: p.name, filename: p.filename, size: p.data?.length })));
         
         const audioPart = parts.find(p => p.name === 'audio' && p.data && p.data.length > 0);
@@ -89,23 +84,17 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'No audio file found' });
         }
 
-        // Determine file extension from original filename
         let ext = 'mp3';
         if (audioPart.filename) {
             const match = audioPart.filename.match(/\.(\w+)$/);
             if (match) ext = match[1].toLowerCase();
         }
 
-        // Write to temp file with correct extension
-        tempFilePath = path.join(os.tmpdir(), `audio-${Date.now()}.${ext}`);
+        tempFilePath = path.join(os.tmpdir(), 'audio-' + Date.now() + '.' + ext);
         fs.writeFileSync(tempFilePath, audioPart.data);
-        
-        console.log('Wrote temp file:', tempFilePath, 'Size:', audioPart.data.length, 'Extension:', ext);
+        console.log('Wrote temp file:', tempFilePath, 'Size:', audioPart.data.length);
 
-        // Initialize OpenAI
         const openai = new OpenAI({ apiKey });
-
-        // Call Whisper API with file path
         console.log('Calling OpenAI Whisper API...');
         
         const transcription = await openai.audio.transcriptions.create({
@@ -113,14 +102,10 @@ export default async function handler(req, res) {
             model: 'whisper-1',
         });
 
-        // Clean up temp file
         try { fs.unlinkSync(tempFilePath); } catch (e) {}
-
         console.log('Transcription successful!');
 
-        return res.status(200).json({ 
-            transcript: transcription.text,
-        });
+        return res.status(200).json({ transcript: transcription.text });
 
     } catch (error) {
         console.error('Error:', error);
