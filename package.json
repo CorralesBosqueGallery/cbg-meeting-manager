@@ -1,12 +1,12 @@
 {
   "name": "cbg-meeting-manager",
   "version": "1.0.0",
+  "type": "module",
   "description": "Meeting recording, transcription, and minutes generation for Corrales Bosque Gallery",
   "main": "index.html",
   "dependencies": {
     "docx": "^8.5.0",
-    "formidable": "^3.5.1",
-    "form-data": "^4.0.0"
+    "openai": "^4.24.0"
   },
   "engines": {
     "node": ">=18"
