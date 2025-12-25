@@ -1,4 +1,3 @@
-import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -34,7 +33,6 @@ function parseMultipart(buffer, boundary) {
         const headerPart = section.substring(0, headerEndIndex);
         const bodyPart = section.substring(headerEndIndex + 4);
         
-        // Remove trailing \r\n
         const cleanBody = bodyPart.replace(/\r\n$/, '');
         
         const nameMatch = headerPart.match(/name="([^"]+)"/);
@@ -42,7 +40,6 @@ function parseMultipart(buffer, boundary) {
         const contentTypeMatch = headerPart.match(/Content-Type:\s*([^\r\n]+)/i);
         
         if (nameMatch) {
-            // Convert binary string back to buffer for the body
             const bodyBuffer = Buffer.from(cleanBody, 'binary');
             parts.push({
                 name: nameMatch[1],
@@ -73,7 +70,7 @@ export default async function handler(req, res) {
         const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^\s;]+))/);
         
         if (!boundaryMatch) {
-            return res.status(400).json({ error: 'No multipart boundary found in: ' + contentType });
+            return res.status(400).json({ error: 'No multipart boundary found' });
         }
         
         const boundary = boundaryMatch[1] || boundaryMatch[2];
@@ -88,72 +85,30 @@ export default async function handler(req, res) {
         const audioPart = parts.find(p => p.name === 'audio' && p.data && p.data.length > 0);
         
         if (!audioPart) {
-            return res.status(400).json({ 
-                error: 'No audio file found',
-                partsFound: parts.map(p => ({ name: p.name, filename: p.filename, size: p.data?.length || 0 }))
-            });
+            return res.status(400).json({ error: 'No audio file found' });
         }
 
-        // Determine file extension
-        let ext = 'webm';
+        // Determine file extension from original filename
+        let ext = 'mp3';
         if (audioPart.filename) {
             const match = audioPart.filename.match(/\.(\w+)$/);
             if (match) ext = match[1].toLowerCase();
-        } else if (audioPart.contentType) {
-            const mimeToExt = {
-                'audio/webm': 'webm',
-                'audio/mp4': 'm4a',
-                'audio/x-m4a': 'm4a',
-                'audio/m4a': 'm4a',
-                'audio/mpeg': 'mp3',
-                'audio/mp3': 'mp3',
-                'audio/wav': 'wav',
-            };
-            ext = mimeToExt[audioPart.contentType] || 'webm';
         }
+        
+        // Map extensions to what OpenAI expects
+        const extMap = {
+            'm4a': 'm4a',
+            'mp3': 'mp3',
+            'mp4': 'mp4',
+            'mpeg': 'mpeg',
+            'mpga': 'mpga',
+            'wav': 'wav',
+            'webm': 'webm',
+            'ogg': 'ogg',
+            'oga': 'oga',
+            'flac': 'flac',
+        };
+        ext = extMap[ext] || 'mp3';
 
-        // Write to temp file
+        // Write to temp file with correct extension
         tempFilePath = path.join(os.tmpdir(), `audio-${Date.now()}.${ext}`);
-        fs.writeFileSync(tempFilePath, audioPart.data);
-        
-        console.log('Wrote temp file:', tempFilePath, 'Size:', audioPart.data.length);
-
-        // Initialize OpenAI client
-        const openai = new OpenAI({ apiKey });
-
-        // Create a readable stream from the file
-        const audioStream = fs.createReadStream(tempFilePath);
-
-        console.log('Calling OpenAI Whisper API...');
-
-        // Call Whisper API
-        const transcription = await openai.audio.transcriptions.create({
-            file: audioStream,
-            model: 'whisper-1',
-            language: 'en',
-        });
-
-        console.log('Transcription successful!');
-
-        // Clean up temp file
-        try {
-            fs.unlinkSync(tempFilePath);
-        } catch (e) {
-            console.warn('Could not delete temp file');
-        }
-
-        return res.status(200).json({ 
-            transcript: transcription.text,
-        });
-
-    } catch (error) {
-        console.error('Transcription error:', error.message);
-        
-        // Clean up temp file on error
-        if (tempFilePath) {
-            try { fs.unlinkSync(tempFilePath); } catch (e) {}
-        }
-        
-        return res.status(500).json({ error: error.message || 'Internal server error' });
-    }
-}
