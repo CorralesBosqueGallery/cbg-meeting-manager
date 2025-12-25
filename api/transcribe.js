@@ -1,3 +1,4 @@
+import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -94,21 +95,38 @@ export default async function handler(req, res) {
             const match = audioPart.filename.match(/\.(\w+)$/);
             if (match) ext = match[1].toLowerCase();
         }
-        
-        // Map extensions to what OpenAI expects
-        const extMap = {
-            'm4a': 'm4a',
-            'mp3': 'mp3',
-            'mp4': 'mp4',
-            'mpeg': 'mpeg',
-            'mpga': 'mpga',
-            'wav': 'wav',
-            'webm': 'webm',
-            'ogg': 'ogg',
-            'oga': 'oga',
-            'flac': 'flac',
-        };
-        ext = extMap[ext] || 'mp3';
 
         // Write to temp file with correct extension
         tempFilePath = path.join(os.tmpdir(), `audio-${Date.now()}.${ext}`);
+        fs.writeFileSync(tempFilePath, audioPart.data);
+        
+        console.log('Wrote temp file:', tempFilePath, 'Size:', audioPart.data.length, 'Extension:', ext);
+
+        // Initialize OpenAI
+        const openai = new OpenAI({ apiKey });
+
+        // Call Whisper API with file path
+        console.log('Calling OpenAI Whisper API...');
+        
+        const transcription = await openai.audio.transcriptions.create({
+            file: fs.createReadStream(tempFilePath),
+            model: 'whisper-1',
+        });
+
+        // Clean up temp file
+        try { fs.unlinkSync(tempFilePath); } catch (e) {}
+
+        console.log('Transcription successful!');
+
+        return res.status(200).json({ 
+            transcript: transcription.text,
+        });
+
+    } catch (error) {
+        console.error('Error:', error);
+        if (tempFilePath) {
+            try { fs.unlinkSync(tempFilePath); } catch (e) {}
+        }
+        return res.status(500).json({ error: error.message });
+    }
+}
