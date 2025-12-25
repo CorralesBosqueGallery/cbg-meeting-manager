@@ -1,3 +1,8 @@
+import OpenAI from 'openai';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
 export const config = {
     api: {
         bodyParser: false,
@@ -14,39 +19,38 @@ async function getRawBody(req) {
 
 function parseMultipart(buffer, boundary) {
     const parts = [];
-    const boundaryBuffer = Buffer.from('--' + boundary);
+    const boundaryStr = '--' + boundary;
+    const bufferStr = buffer.toString('binary');
     
-    let start = buffer.indexOf(boundaryBuffer) + boundaryBuffer.length;
+    const sections = bufferStr.split(boundaryStr);
     
-    while (start < buffer.length) {
-        let end = buffer.indexOf(boundaryBuffer, start);
-        if (end === -1) break;
+    for (let i = 1; i < sections.length; i++) {
+        const section = sections[i];
+        if (section.trim() === '--' || section.trim() === '') continue;
         
-        const part = buffer.slice(start, end);
+        const headerEndIndex = section.indexOf('\r\n\r\n');
+        if (headerEndIndex === -1) continue;
         
-        let headerEnd = part.indexOf('\r\n\r\n');
-        if (headerEnd === -1) {
-            start = end + boundaryBuffer.length;
-            continue;
-        }
+        const headerPart = section.substring(0, headerEndIndex);
+        const bodyPart = section.substring(headerEndIndex + 4);
         
-        const headerSection = part.slice(0, headerEnd).toString();
-        const body = part.slice(headerEnd + 4, -2);
+        // Remove trailing \r\n
+        const cleanBody = bodyPart.replace(/\r\n$/, '');
         
-        const nameMatch = headerSection.match(/name="([^"]+)"/);
-        const filenameMatch = headerSection.match(/filename="([^"]+)"/);
-        const contentTypeMatch = headerSection.match(/Content-Type:\s*([^\r\n]+)/i);
+        const nameMatch = headerPart.match(/name="([^"]+)"/);
+        const filenameMatch = headerPart.match(/filename="([^"]+)"/);
+        const contentTypeMatch = headerPart.match(/Content-Type:\s*([^\r\n]+)/i);
         
         if (nameMatch) {
+            // Convert binary string back to buffer for the body
+            const bodyBuffer = Buffer.from(cleanBody, 'binary');
             parts.push({
                 name: nameMatch[1],
                 filename: filenameMatch ? filenameMatch[1] : null,
-                contentType: contentTypeMatch ? contentTypeMatch[1] : null,
-                data: body,
+                contentType: contentTypeMatch ? contentTypeMatch[1].trim() : null,
+                data: bodyBuffer,
             });
         }
-        
-        start = end + boundaryBuffer.length;
     }
     
     return parts;
@@ -62,67 +66,94 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'OpenAI API key not configured' });
     }
 
+    let tempFilePath = null;
+
     try {
         const contentType = req.headers['content-type'] || '';
         const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^\s;]+))/);
         
         if (!boundaryMatch) {
-            return res.status(400).json({ error: 'No multipart boundary found' });
+            return res.status(400).json({ error: 'No multipart boundary found in: ' + contentType });
         }
         
         const boundary = boundaryMatch[1] || boundaryMatch[2];
         const rawBody = await getRawBody(req);
+        
+        console.log('Raw body size:', rawBody.length);
+        
         const parts = parseMultipart(rawBody, boundary);
+        
+        console.log('Parts found:', parts.map(p => ({ name: p.name, filename: p.filename, size: p.data?.length })));
         
         const audioPart = parts.find(p => p.name === 'audio' && p.data && p.data.length > 0);
         
         if (!audioPart) {
             return res.status(400).json({ 
                 error: 'No audio file found',
-                partsFound: parts.map(p => ({ name: p.name, size: p.data?.length || 0 }))
+                partsFound: parts.map(p => ({ name: p.name, filename: p.filename, size: p.data?.length || 0 }))
             });
         }
 
-        // Use .wav extension which OpenAI handles well
-        const filename = 'audio.wav';
-        
-        console.log('Audio size:', audioPart.data.length, 'bytes');
+        // Determine file extension
+        let ext = 'webm';
+        if (audioPart.filename) {
+            const match = audioPart.filename.match(/\.(\w+)$/);
+            if (match) ext = match[1].toLowerCase();
+        } else if (audioPart.contentType) {
+            const mimeToExt = {
+                'audio/webm': 'webm',
+                'audio/mp4': 'm4a',
+                'audio/x-m4a': 'm4a',
+                'audio/m4a': 'm4a',
+                'audio/mpeg': 'mp3',
+                'audio/mp3': 'mp3',
+                'audio/wav': 'wav',
+            };
+            ext = mimeToExt[audioPart.contentType] || 'webm';
+        }
 
-        // Use native FormData (available in Node 18+)
-        const formData = new FormData();
+        // Write to temp file
+        tempFilePath = path.join(os.tmpdir(), `audio-${Date.now()}.${ext}`);
+        fs.writeFileSync(tempFilePath, audioPart.data);
         
-        // Create a Blob from the buffer
-        const audioBlob = new Blob([audioPart.data], { type: 'audio/wav' });
-        formData.append('file', audioBlob, filename);
-        formData.append('model', 'whisper-1');
-        formData.append('language', 'en');
+        console.log('Wrote temp file:', tempFilePath, 'Size:', audioPart.data.length);
 
-        // Call OpenAI Whisper API
-        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-            },
-            body: formData,
+        // Initialize OpenAI client
+        const openai = new OpenAI({ apiKey });
+
+        // Create a readable stream from the file
+        const audioStream = fs.createReadStream(tempFilePath);
+
+        console.log('Calling OpenAI Whisper API...');
+
+        // Call Whisper API
+        const transcription = await openai.audio.transcriptions.create({
+            file: audioStream,
+            model: 'whisper-1',
+            language: 'en',
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
-            console.error('OpenAI API error:', errorData);
-            return res.status(response.status).json({ 
-                error: errorData.error?.message || 'Transcription failed' 
-            });
+        console.log('Transcription successful!');
+
+        // Clean up temp file
+        try {
+            fs.unlinkSync(tempFilePath);
+        } catch (e) {
+            console.warn('Could not delete temp file');
         }
 
-        const transcript = await response.text();
-
         return res.status(200).json({ 
-            transcript,
-            filename: filename,
+            transcript: transcription.text,
         });
 
     } catch (error) {
-        console.error('Transcription error:', error);
+        console.error('Transcription error:', error.message);
+        
+        // Clean up temp file on error
+        if (tempFilePath) {
+            try { fs.unlinkSync(tempFilePath); } catch (e) {}
+        }
+        
         return res.status(500).json({ error: error.message || 'Internal server error' });
     }
 }
