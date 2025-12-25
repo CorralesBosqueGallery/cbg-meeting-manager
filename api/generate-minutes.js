@@ -15,7 +15,6 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'No transcript provided' });
         }
 
-        // Build the prompt
         const meetingTypeNames = {
             'member': 'General Membership Meeting',
             'board': 'Board of Directors Meeting',
@@ -24,63 +23,45 @@ export default async function handler(req, res) {
         };
 
         const meetingType = meetingTypeNames[agenda?.type] || 'Meeting';
-        const meetingDate = agenda?.date || 'Unknown Date';
+        const meetingDate = agenda?.date || new Date().toISOString().split('T')[0];
 
-        const agendaText = agenda?.items?.map((item, i) => {
-            let text = `${i + 1}. ${item.title}`;
-            if (item.isVote) text += ' (VOTE)';
-            if (item.subItems?.length) {
-                item.subItems.forEach((sub, j) => {
-                    text += `\n   ${String.fromCharCode(97 + j)}. ${sub.text}`;
-                });
-            }
-            return text;
-        }).join('\n') || 'No agenda provided';
+        const systemPrompt = `You are a meeting minutes writer. Your job is to convert a transcript into meeting minutes.
 
-        const systemPrompt = `You are a professional meeting minutes writer for the Corrales Bosque Gallery, an artists' cooperative in New Mexico. Your task is to convert meeting transcripts into clear, well-organized meeting minutes.
+CRITICAL RULES:
+1. ONLY include information that is ACTUALLY in the transcript
+2. Do NOT make up names, topics, or discussions that aren't in the transcript
+3. Do NOT invent attendees, motions, or action items
+4. If the transcript is very short or just a test, say so - do not create fake content
+5. If you cannot identify specific agenda items from the transcript, just summarize what was actually said
 
-Guidelines:
-- Use formal but accessible language
-- Organize content by agenda items when possible
-- Note all motions, who made them, who seconded, and the result (passed/failed/tabled)
-- Note attendance/quorum if mentioned
-- Identify and extract action items (who will do what, by when)
-- Keep the tone professional but warm
-- Use the gallery's terminology (CBG, First Sunday, consignment, jurying, etc.)
+Format:
+# [Meeting Type] Minutes
+**Date:** [date]
 
-Format the minutes with clear sections using markdown:
-# Meeting Title
-## Attendees (if mentioned)
-## Agenda Item 1
-[content]
-## Agenda Item 2
-[content]
-etc.
+## Summary
+[Brief summary of what was ACTUALLY discussed in the transcript]
 
-At the end, include a section:
+## Discussion
+[What was ACTUALLY said - use quotes if helpful]
+
 ## Action Items
-- [Person]: [Task] (Due: [date if mentioned])`;
+[ONLY if specific action items were mentioned in the transcript]
+- [Person]: [Task] (if mentioned)
 
-        const userPrompt = `Please convert this transcript into formal meeting minutes.
+If the transcript is just a test recording or doesn't contain meeting content, simply note that.`;
 
-MEETING INFO:
-Type: ${meetingType}
+        const userPrompt = `Convert this transcript into meeting minutes. Remember: ONLY include what is actually in the transcript. Do not make up any content.
+
+Meeting Type: ${meetingType}
 Date: ${meetingDate}
-Location: ${agenda?.location || 'Gallery'}
-
-AGENDA:
-${agendaText}
 
 TRANSCRIPT:
-${transcript}
+"${transcript}"
 
-Please generate:
-1. Well-formatted meeting minutes organized by agenda items
-2. A list of action items extracted from the discussion
+Generate minutes based ONLY on the above transcript.`;
 
-Format the minutes in markdown. For action items, identify WHO is responsible, WHAT they need to do, and WHEN (if mentioned).`;
+        console.log('Generating minutes for transcript length:', transcript.length);
 
-        // Call OpenAI API
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -94,12 +75,12 @@ Format the minutes in markdown. For action items, identify WHO is responsible, W
                     { role: 'user', content: userPrompt }
                 ],
                 temperature: 0.3,
-                max_tokens: 4000,
+                max_tokens: 2000,
             }),
         });
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: { message: response.statusText } }));
+            const error = await response.json().catch(() => ({}));
             console.error('OpenAI API error:', error);
             return res.status(response.status).json({ 
                 error: error.error?.message || 'Minutes generation failed' 
@@ -109,53 +90,31 @@ Format the minutes in markdown. For action items, identify WHO is responsible, W
         const result = await response.json();
         const minutes = result.choices[0].message.content;
 
-        // Extract action items from the minutes
-        const actionItems = extractActionItems(minutes);
+        // Extract action items
+        const actionItems = [];
+        const actionSection = minutes.match(/## Action Items[\s\S]*?(?=##|$)/i);
+        if (actionSection) {
+            const bullets = actionSection[0].match(/[-•]\s*(.+)/g);
+            if (bullets) {
+                bullets.forEach(bullet => {
+                    const text = bullet.replace(/^[-•]\s*/, '');
+                    const colonMatch = text.match(/^([^:]+):\s*(.+)/);
+                    if (colonMatch) {
+                        actionItems.push({
+                            assignee: colonMatch[1].trim(),
+                            task: colonMatch[2].trim(),
+                            dueDate: null
+                        });
+                    }
+                });
+            }
+        }
 
-        return res.status(200).json({ 
-            minutes,
-            actionItems,
-        });
+        console.log('Minutes generated successfully');
+        return res.status(200).json({ minutes, actionItems });
 
     } catch (error) {
-        console.error('Minutes generation error:', error);
-        return res.status(500).json({ error: error.message || 'Internal server error' });
+        console.error('Error:', error);
+        return res.status(500).json({ error: error.message });
     }
-}
-
-function extractActionItems(minutes) {
-    const actionItems = [];
-    
-    // Look for the Action Items section
-    const actionSection = minutes.match(/## Action Items[\s\S]*?(?=##|$)/i);
-    if (actionSection) {
-        // Extract bullet points
-        const bullets = actionSection[0].match(/[-•]\s*(.+)/g);
-        if (bullets) {
-            bullets.forEach(bullet => {
-                const text = bullet.replace(/^[-•]\s*/, '');
-                
-                // Try to parse assignee and task
-                const colonMatch = text.match(/^([^:]+):\s*(.+)/);
-                if (colonMatch) {
-                    const assignee = colonMatch[1].trim();
-                    let task = colonMatch[2].trim();
-                    let dueDate = null;
-
-                    // Try to extract due date
-                    const dueMatch = task.match(/\(Due:?\s*([^)]+)\)/i);
-                    if (dueMatch) {
-                        dueDate = dueMatch[1].trim();
-                        task = task.replace(dueMatch[0], '').trim();
-                    }
-
-                    actionItems.push({ assignee, task, dueDate });
-                } else {
-                    actionItems.push({ assignee: 'Unassigned', task: text, dueDate: null });
-                }
-            });
-        }
-    }
-
-    return actionItems;
 }
